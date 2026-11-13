@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 fw-bold mb-0">Companies</h1>
+    <button class="btn btn-brand" type="button" onclick="openAddCompanyModal()">
+        + Add Company
+    </button>
+</div>
+
+<div class="dashboard-table">
+    <table class="table table-hover mb-0 align-middle">
+        <thead>
+            <tr>
+                <th>Company</th>
+                <th>Industry</th>
+                <th>Location</th>
+                <th>Website</th>
+                <th>Notes</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in companies %}
+            <tr>
+                <td class="fw-semibold">{{ c.company_name }}</td>
+                <td>{{ c.industry or '-' }}</td>
+                <td>{{ c.city or '' }}{{ ', ' + c.state if c.state else '' }}</td>
+                <td>{{ c.website or '-' }}</td>
+                <td class="text-muted small">{{ c.notes or '-' }}</td>
+                <td class="text-end text-nowrap">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        data-id="{{ c.company_id }}"
+                        data-name="{{ c.company_name }}"
+                        data-industry="{{ c.industry or '' }}"
+                        data-website="{{ c.website or '' }}"
+                        data-city="{{ c.city or '' }}"
+                        data-state="{{ c.state or '' }}"
+                        data-notes="{{ c.notes or '' }}"
+                        onclick="openEditCompanyModal(this)">
+                        Edit
+                    </button>
+                    <form class="d-inline" method="POST" action="{{ url_for('delete_company', company_id=c.company_id) }}" onsubmit="return confirm('Delete this company?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="6" class="text-center text-muted py-4">No companies yet. Click "+ Add Company" to create one.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="modal fade" id="companyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 16px;">
+            <form id="companyForm" method="POST" action="{{ url_for('companies') }}">
+                <div class="modal-header border-bottom">
+                    <h2 class="modal-title h5 fw-bold" id="companyModalTitle">Add Company</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Company Name *</label>
+                            <input type="text" class="form-control" id="companyName" name="company_name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Industry</label>
+                            <input type="text" class="form-control" id="companyIndustry" name="industry">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">City</label>
+                            <input type="text" class="form-control" id="companyCity" name="city">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">State</label>
+                            <input type="text" class="form-control" id="companyState" name="state">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Website</label>
+                            <input type="text" class="form-control" id="companyWebsite" name="website">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Notes</label>
+                            <textarea class="form-control" id="companyNotes" name="notes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-brand" id="companySubmitBtn">Save Company</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function getCompanyModal() {
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('companyModal'));
+    }
+
+    function openAddCompanyModal() {
+        const form = document.getElementById('companyForm');
+        document.getElementById('companyModalTitle').textContent = 'Add Company';
+        document.getElementById('companySubmitBtn').textContent = 'Save Company';
+        form.action = "{{ url_for('companies') }}";
+        form.reset();
+        getCompanyModal().show();
+    }
+
+    function openEditCompanyModal(btn) {
+        const form = document.getElementById('companyForm');
+        document.getElementById('companyModalTitle').textContent = 'Edit Company';
+        document.getElementById('companySubmitBtn').textContent = 'Save Changes';
+        form.action = `/companies/update/${btn.dataset.id}`;
+        document.getElementById('companyName').value = btn.dataset.name;
+        document.getElementById('companyIndustry').value = btn.dataset.industry;
+        document.getElementById('companyWebsite').value = btn.dataset.website;
+        document.getElementById('companyCity').value = btn.dataset.city;
+        document.getElementById('companyState').value = btn.dataset.state;
+        document.getElementById('companyNotes').value = btn.dataset.notes;
+        getCompanyModal().show();
+    }
+</script>
+{% endblock %}
