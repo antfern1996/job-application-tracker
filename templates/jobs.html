@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 fw-bold mb-0">Jobs</h1>
+    <button class="btn btn-brand" type="button" onclick="openAddJobModal()">
+        + Add Job
+    </button>
+</div>
+
+<div class="dashboard-table">
+    <table class="table table-hover mb-0 align-middle">
+        <thead>
+            <tr>
+                <th>Job Title</th>
+                <th>Company</th>
+                <th>Type</th>
+                <th>Salary Range</th>
+                <th>Required Skills</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for j in jobs %}
+            {% set req = j.requirements or {} %}
+            <tr>
+                <td class="fw-semibold">
+                    {{ j.job_title }}
+                    {% if req.get('remote_option') %}
+                        <span class="badge bg-info text-dark ms-1">Remote</span>
+                    {% endif %}
+                </td>
+                <td>{{ j.company_name }}</td>
+                <td>{{ j.job_type or '-' }}</td>
+                <td>
+                    {% if j.salary_min or j.salary_max %}
+                        ${{ "{:,.0f}".format(j.salary_min or 0) }} - ${{ "{:,.0f}".format(j.salary_max or 0) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% for skill in req.get('required_skills', []) %}
+                        <span class="badge bg-light text-dark border">{{ skill }}</span>
+                    {% else %}
+                        <span class="text-muted small">-</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if j.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-secondary">Closed</span>
+                    {% endif %}
+                </td>
+                <td class="text-end text-nowrap">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        data-title="{{ j.job_title }}"
+                        data-company="{{ j.company_name }}"
+                        data-type="{{ j.job_type or '-' }}"
+                        data-salary="{% if j.salary_min or j.salary_max %}${{ '{:,.0f}'.format(j.salary_min or 0) }} - ${{ '{:,.0f}'.format(j.salary_max or 0) }}{% else %}-{% endif %}"
+                        data-posted="{{ j.date_posted or '-' }}"
+                        data-url="{{ j.posting_url or '' }}"
+                        data-description="{{ j.job_description or 'No description provided.' }}"
+                        data-req-skills="{{ req.get('required_skills', []) | join(', ') }}"
+                        data-pref-skills="{{ req.get('preferred_skills', []) | join(', ') }}"
+                        data-education="{{ req.get('education', '-') }}"
+                        data-exp="{{ req.get('experience_years', '-') }}"
+                        data-remote="{{ 'Yes' if req.get('remote_option') else 'No' }}"
+                        onclick="openJobDetailsModal(this)">
+                        View
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        data-id="{{ j.job_id }}"
+                        data-company-id="{{ j.company_id }}"
+                        data-title="{{ j.job_title }}"
+                        data-type="{{ j.job_type or 'Full-time' }}"
+                        data-salary-min="{{ j.salary_min|int if j.salary_min else '' }}"
+                        data-salary-max="{{ j.salary_max|int if j.salary_max else '' }}"
+                        data-url="{{ j.posting_url or '' }}"
+                        data-posted="{{ j.date_posted or '' }}"
+                        data-active="{{ '1' if j.is_active else '0' }}"
+                        data-description="{{ j.job_description or '' }}"
+                        data-req-skills="{{ req.get('required_skills', []) | join(', ') }}"
+                        data-pref-skills="{{ req.get('preferred_skills', []) | join(', ') }}"
+                        data-education="{{ req.get('education', '') }}"
+                        data-exp="{{ req.get('experience_years', '') }}"
+                        data-remote="{{ '1' if req.get('remote_option') else '0' }}"
+                        onclick="openEditJobModal(this)">
+                        Edit
+                    </button>
+                    <form class="d-inline" method="POST" action="{{ url_for('delete_job', job_id=j.job_id) }}" onsubmit="return confirm('Delete this job?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No jobs yet. Click "+ Add Job" to create one.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Job Modal -->
+<div class="modal fade" id="jobModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 16px;">
+            <form id="jobForm" method="POST" action="{{ url_for('jobs') }}">
+                <div class="modal-header border-bottom">
+                    <h2 class="modal-title h5 fw-bold" id="jobModalTitle">Add Job</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Company *</label>
+                            <select class="form-select" id="jobCompanyId" name="company_id" required>
+                                <option value="">Select company...</option>
+                                {% for c in companies %}
+                                    <option value="{{ c.company_id }}">{{ c.company_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Job Title *</label>
+                            <input type="text" class="form-control" id="jobTitle" name="job_title" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Job Type</label>
+                            <select class="form-select" id="jobType" name="job_type">
+                                <option value="Full-time">Full-time</option>
+                                <option value="Part-time">Part-time</option>
+                                <option value="Contract">Contract</option>
+                                <option value="Internship">Internship</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Min Salary</label>
+                            <input type="number" class="form-control" id="jobSalaryMin" name="salary_min" placeholder="70000">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Max Salary</label>
+                            <input type="number" class="form-control" id="jobSalaryMax" name="salary_max" placeholder="90000">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Posting URL</label>
+                            <input type="text" class="form-control" id="jobUrl" name="posting_url">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Date Posted</label>
+                            <input type="date" class="form-control" id="jobDatePosted" name="date_posted">
+                        </div>
+
+                        <div class="col-12"><hr class="my-1"><div class="small fw-bold text-uppercase text-muted">Requirements (JSON)</div></div>
+
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Required Skills (comma-separated)</label>
+                            <input type="text" class="form-control" id="jobReqSkills" name="required_skills" placeholder="Python, SQL, Git">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Preferred Skills (comma-separated)</label>
+                            <input type="text" class="form-control" id="jobPrefSkills" name="preferred_skills" placeholder="Flask, Docker, AWS">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Education</label>
+                            <input type="text" class="form-control" id="jobEducation" name="education" placeholder="Bachelor in CS">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Experience (Yrs)</label>
+                            <input type="number" min="0" class="form-control" id="jobExp" name="experience_years" placeholder="2">
+                        </div>
+                        <div class="col-md-3 d-flex flex-column justify-content-end gap-2">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="jobRemote" name="remote_option">
+                                <label class="form-check-label" for="jobRemote">Remote Option</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="jobActive" name="is_active" checked>
+                                <label class="form-check-label" for="jobActive">Active Posting</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Description</label>
+                            <textarea class="form-control" id="jobDescription" name="job_description" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-brand" id="jobSubmitBtn">Save Job</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Job Detail Modal -->
+<div class="modal fade" id="jobDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 16px;">
+            <div class="modal-header border-bottom">
+                <div>
+                    <h2 class="modal-title h5 fw-bold" id="detailJobTitle"></h2>
+                    <div class="text-muted small" id="detailJobCompany"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>Type:</strong> <span id="detailJobType"></span> | <strong>Remote:</strong> <span id="detailJobRemote"></span></p>
+                <p class="mb-2"><strong>Salary:</strong> <span id="detailJobSalary"></span> | <strong>Posted:</strong> <span id="detailJobPosted"></span></p>
+                <p class="mb-2"><strong>Education:</strong> <span id="detailJobEducation"></span> | <strong>Experience:</strong> <span id="detailJobExp"></span> yrs</p>
+                <p class="mb-2"><strong>Required Skills:</strong> <span id="detailJobReqSkills"></span></p>
+                <p class="mb-2"><strong>Preferred Skills:</strong> <span id="detailJobPrefSkills"></span></p>
+                <p class="mb-2" id="detailUrlRow"><strong>Posting URL:</strong> <a id="detailJobUrl" href="#" target="_blank"></a></p>
+                <p class="mb-0"><strong>Description:</strong><br><span class="text-muted" id="detailJobDesc"></span></p>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function getJobModal() {
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('jobModal'));
+    }
+
+    function openAddJobModal() {
+        const form = document.getElementById('jobForm');
+        document.getElementById('jobModalTitle').textContent = 'Add Job';
+        document.getElementById('jobSubmitBtn').textContent = 'Save Job';
+        form.action = "{{ url_for('jobs') }}";
+        form.reset();
+        document.getElementById('jobActive').checked = true;
+        getJobModal().show();
+    }
+
+    function openEditJobModal(btn) {
+        const form = document.getElementById('jobForm');
+        document.getElementById('jobModalTitle').textContent = 'Edit Job';
+        document.getElementById('jobSubmitBtn').textContent = 'Save Changes';
+        form.action = `/jobs/update/${btn.dataset.id}`;
+
+        document.getElementById('jobCompanyId').value = btn.dataset.companyId;
+        document.getElementById('jobTitle').value = btn.dataset.title;
+        document.getElementById('jobType').value = btn.dataset.type;
+        document.getElementById('jobSalaryMin').value = btn.dataset.salaryMin;
+        document.getElementById('jobSalaryMax').value = btn.dataset.salaryMax;
+        document.getElementById('jobUrl').value = btn.dataset.url;
+        document.getElementById('jobDatePosted').value = btn.dataset.posted;
+        document.getElementById('jobActive').checked = btn.dataset.active === '1';
+        document.getElementById('jobDescription').value = btn.dataset.description;
+        document.getElementById('jobReqSkills').value = btn.dataset.reqSkills;
+        document.getElementById('jobPrefSkills').value = btn.dataset.prefSkills;
+        document.getElementById('jobEducation').value = btn.dataset.education;
+        document.getElementById('jobExp').value = btn.dataset.exp;
+        document.getElementById('jobRemote').checked = btn.dataset.remote === '1';
+
+        getJobModal().show();
+    }
+
+    function openJobDetailsModal(btn) {
+        document.getElementById('detailJobTitle').textContent = btn.dataset.title;
+        document.getElementById('detailJobCompany').textContent = btn.dataset.company;
+        document.getElementById('detailJobType').textContent = btn.dataset.type;
+        document.getElementById('detailJobRemote').textContent = btn.dataset.remote;
+        document.getElementById('detailJobSalary').textContent = btn.dataset.salary;
+        document.getElementById('detailJobPosted').textContent = btn.dataset.posted;
+        document.getElementById('detailJobEducation').textContent = btn.dataset.education || '-';
+        document.getElementById('detailJobExp').textContent = btn.dataset.exp || '-';
+        document.getElementById('detailJobReqSkills').textContent = btn.dataset.reqSkills || '-';
+        document.getElementById('detailJobPrefSkills').textContent = btn.dataset.prefSkills || '-';
+        document.getElementById('detailJobDesc').textContent = btn.dataset.description;
+
+        const urlRow = document.getElementById('detailUrlRow');
+        const urlLink = document.getElementById('detailJobUrl');
+        if (btn.dataset.url) {
+            urlRow.style.display = 'block';
+            urlLink.href = btn.dataset.url.startsWith('http') ? btn.dataset.url : 'https://' + btn.dataset.url;
+            urlLink.textContent = btn.dataset.url;
+        } else {
+            urlRow.style.display = 'none';
+        }
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('jobDetailsModal')).show();
+    }
+</script>
+{% endblock %}

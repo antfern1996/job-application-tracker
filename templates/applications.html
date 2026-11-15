@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 fw-bold mb-0">Applications</h1>
+    <button class="btn btn-brand" type="button" onclick="openAddAppModal()">
+        + Add Application
+    </button>
+</div>
+
+<div class="dashboard-table">
+    <table class="table table-hover mb-0 align-middle">
+        <thead>
+            <tr>
+                <th>Job Title</th>
+                <th>Company</th>
+                <th>Date Applied</th>
+                <th>Status</th>
+                <th>Resume</th>
+                <th>Cover Letter</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for a in applications %}
+            {% set iv = a.interview_data or {} %}
+            <tr>
+                <td class="fw-semibold">{{ a.job_title }}</td>
+                <td>{{ a.company_name }}</td>
+                <td>{{ a.application_date }}</td>
+                <td>
+                    {% if a.status == 'Offer Accepted' or a.status == 'Offer' %}
+                        <span class="badge bg-success">{{ a.status }}</span>
+                    {% elif a.status == 'Rejected' or a.status == 'Withdrawn' %}
+                        <span class="badge bg-danger">{{ a.status }}</span>
+                    {% else %}
+                        <span class="badge" style="background-color: var(--blue-900);">{{ a.status }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ a.resume_version or '-' }}</td>
+                <td>{{ 'Yes' if a.cover_letter_sent else 'No' }}</td>
+                <td class="text-end text-nowrap">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        data-title="{{ a.job_title }}"
+                        data-company="{{ a.company_name }}"
+                        data-date="{{ a.application_date }}"
+                        data-response="{{ a.response_date or '-' }}"
+                        data-status="{{ a.status }}"
+                        data-resume="{{ a.resume_version or '-' }}"
+                        data-cover="{{ 'Yes' if a.cover_letter_sent else 'No' }}"
+                        data-notes="{{ a.notes or '-' }}"
+                        data-rounds="{{ iv.get('interview_rounds', '-') }}"
+                        data-interviewers="{{ iv.get('interviewers', []) | join(', ') }}"
+                        data-questions="{{ iv.get('technical_questions', []) | join(', ') }}"
+                        data-feedback="{{ iv.get('feedback', '-') }}"
+                        data-next="{{ iv.get('next_steps', '-') }}"
+                        data-offer="{% if iv.get('offer_amount') %}${{ '{:,.0f}'.format(iv.get('offer_amount')) }}{% else %}-{% endif %}"
+                        onclick="openAppDetailsModal(this)">
+                        View
+                    </button>
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        data-id="{{ a.application_id }}"
+                        data-job-id="{{ a.job_id }}"
+                        data-date="{{ a.application_date }}"
+                        data-response="{{ a.response_date or '' }}"
+                        data-status="{{ a.status }}"
+                        data-resume="{{ a.resume_version or '' }}"
+                        data-cover="{{ '1' if a.cover_letter_sent else '0' }}"
+                        data-notes="{{ a.notes or '' }}"
+                        data-rounds="{{ iv.get('interview_rounds', '') }}"
+                        data-interviewers="{{ iv.get('interviewers', []) | join(', ') }}"
+                        data-questions="{{ iv.get('technical_questions', []) | join(', ') }}"
+                        data-feedback="{{ iv.get('feedback', '') }}"
+                        data-next="{{ iv.get('next_steps', '') }}"
+                        data-offer="{{ iv.get('offer_amount', '') }}"
+                        onclick="openEditAppModal(this)">
+                        Edit
+                    </button>
+                    <form class="d-inline" method="POST" action="{{ url_for('delete_application', application_id=a.application_id) }}" onsubmit="return confirm('Delete this application?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No applications yet. Click "+ Add Application" to create one.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Application Modal -->
+<div class="modal fade" id="appModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 16px;">
+            <form id="appForm" method="POST" action="{{ url_for('applications') }}">
+                <div class="modal-header border-bottom">
+                    <h2 class="modal-title h5 fw-bold" id="appModalTitle">Add Application</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Job *</label>
+                            <select class="form-select" id="appJobId" name="job_id" required>
+                                <option value="">Select job...</option>
+                                {% for j in jobs %}
+                                    <option value="{{ j.job_id }}">{{ j.job_title }} — {{ j.company_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Date Applied *</label>
+                            <input type="date" class="form-control" id="appDate" name="application_date" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select class="form-select" id="appStatus" name="status">
+                                <option value="Applied">Applied</option>
+                                <option value="Phone Screen">Phone Screen</option>
+                                <option value="Screening">Screening</option>
+                                <option value="Interview">Interview</option>
+                                <option value="Interview Completed">Interview Completed</option>
+                                <option value="Offer">Offer</option>
+                                <option value="Offer Accepted">Offer Accepted</option>
+                                <option value="Rejected">Rejected</option>
+                                <option value="Withdrawn">Withdrawn</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Resume Version</label>
+                            <input type="text" class="form-control" id="appResume" name="resume_version" placeholder="v3.0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Response Date</label>
+                            <input type="date" class="form-control" id="appResponseDate" name="response_date">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="appCoverLetter" name="cover_letter_sent">
+                                <label class="form-check-label fw-semibold" for="appCoverLetter">Cover Letter Sent</label>
+                            </div>
+                        </div>
+
+                        <div class="col-12"><hr class="my-1"><div class="small fw-bold text-uppercase text-muted">Interview Data (JSON)</div></div>
+
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Interview Rounds</label>
+                            <input type="number" min="0" class="form-control" id="appRounds" name="interview_rounds" placeholder="2">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Offer Amount ($)</label>
+                            <input type="number" min="0" class="form-control" id="appOffer" name="offer_amount" placeholder="85000">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Interviewers (comma-separated)</label>
+                            <input type="text" class="form-control" id="appInterviewers" name="interviewers" placeholder="Sarah Johnson, Mike Chen">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Technical Questions (comma-separated)</label>
+                            <input type="text" class="form-control" id="appQuestions" name="technical_questions" placeholder="SQL joins, API design">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Next Steps</label>
+                            <input type="text" class="form-control" id="appNextSteps" name="next_steps" placeholder="Final round scheduled">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Interview Feedback</label>
+                            <input type="text" class="form-control" id="appFeedback" name="feedback">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">General Notes</label>
+                            <input type="text" class="form-control" id="appNotes" name="notes">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-brand" id="appSubmitBtn">Save Application</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Application Detail Modal -->
+<div class="modal fade" id="appDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 16px;">
+            <div class="modal-header border-bottom">
+                <div>
+                    <h2 class="modal-title h5 fw-bold" id="detailAppTitle"></h2>
+                    <div class="text-muted small" id="detailAppCompany"></div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong>Status:</strong> <span id="detailAppStatus"></span> | <strong>Applied:</strong> <span id="detailAppDate"></span></p>
+                <p class="mb-2"><strong>Resume:</strong> <span id="detailAppResume"></span> | <strong>Cover Letter:</strong> <span id="detailAppCover"></span></p>
+                <p class="mb-2"><strong>Response Date:</strong> <span id="detailAppResponse"></span></p>
+                <hr>
+                <p class="mb-2"><strong>Interview Rounds:</strong> <span id="detailAppRounds"></span> | <strong>Offer:</strong> <span id="detailAppOffer"></span></p>
+                <p class="mb-2"><strong>Interviewers:</strong> <span id="detailAppInterviewers"></span></p>
+                <p class="mb-2"><strong>Technical Questions:</strong> <span id="detailAppQuestions"></span></p>
+                <p class="mb-2"><strong>Feedback:</strong> <span id="detailAppFeedback"></span></p>
+                <p class="mb-2"><strong>Next Steps:</strong> <span id="detailAppNext"></span></p>
+                <p class="mb-0"><strong>Notes:</strong> <span id="detailAppNotes"></span></p>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function getAppModal() {
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('appModal'));
+    }
+
+    function openAddAppModal() {
+        const form = document.getElementById('appForm');
+        document.getElementById('appModalTitle').textContent = 'Add Application';
+        document.getElementById('appSubmitBtn').textContent = 'Save Application';
+        form.action = "{{ url_for('applications') }}";
+        form.reset();
+        getAppModal().show();
+    }
+
+    function openEditAppModal(btn) {
+        const form = document.getElementById('appForm');
+        document.getElementById('appModalTitle').textContent = 'Edit Application';
+        document.getElementById('appSubmitBtn').textContent = 'Save Changes';
+        form.action = `/applications/update/${btn.dataset.id}`;
+
+        document.getElementById('appJobId').value = btn.dataset.jobId;
+        document.getElementById('appDate').value = btn.dataset.date;
+        document.getElementById('appStatus').value = btn.dataset.status;
+        document.getElementById('appResume').value = btn.dataset.resume;
+        document.getElementById('appResponseDate').value = btn.dataset.response;
+        document.getElementById('appCoverLetter').checked = btn.dataset.cover === '1';
+        document.getElementById('appRounds').value = btn.dataset.rounds;
+        document.getElementById('appOffer').value = btn.dataset.offer;
+        document.getElementById('appInterviewers').value = btn.dataset.interviewers;
+        document.getElementById('appQuestions').value = btn.dataset.questions;
+        document.getElementById('appNextSteps').value = btn.dataset.next;
+        document.getElementById('appFeedback').value = btn.dataset.feedback;
+        document.getElementById('appNotes').value = btn.dataset.notes;
+
+        getAppModal().show();
+    }
+
+    function openAppDetailsModal(btn) {
+        document.getElementById('detailAppTitle').textContent = btn.dataset.title;
+        document.getElementById('detailAppCompany').textContent = btn.dataset.company;
+        document.getElementById('detailAppStatus').textContent = btn.dataset.status;
+        document.getElementById('detailAppDate').textContent = btn.dataset.date;
+        document.getElementById('detailAppResume').textContent = btn.dataset.resume;
+        document.getElementById('detailAppCover').textContent = btn.dataset.cover;
+        document.getElementById('detailAppResponse').textContent = btn.dataset.response;
+        document.getElementById('detailAppRounds').textContent = btn.dataset.rounds || '-';
+        document.getElementById('detailAppOffer').textContent = btn.dataset.offer;
+        document.getElementById('detailAppInterviewers').textContent = btn.dataset.interviewers || '-';
+        document.getElementById('detailAppQuestions').textContent = btn.dataset.questions || '-';
+        document.getElementById('detailAppFeedback').textContent = btn.dataset.feedback || '-';
+        document.getElementById('detailAppNext').textContent = btn.dataset.next || '-';
+        document.getElementById('detailAppNotes').textContent = btn.dataset.notes;
+
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('appDetailsModal')).show();
+    }
+</script>
+{% endblock %}

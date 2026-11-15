@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 fw-bold mb-0">Contacts</h1>
+    <button class="btn btn-brand" type="button" onclick="openAddContactModal()">
+        + Add Contact
+    </button>
+</div>
+
+<div class="dashboard-table">
+    <table class="table table-hover mb-0 align-middle">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Company</th>
+                <th>Title</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Notes</th>
+                <th class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ct in contacts %}
+            <tr>
+                <td class="fw-semibold">{{ ct.first_name }} {{ ct.last_name }}</td>
+                <td>{{ ct.company_name }}</td>
+                <td>{{ ct.job_title or '-' }}</td>
+                <td>{{ ct.email or '-' }}</td>
+                <td>{{ ct.phone or '-' }}</td>
+                <td class="text-muted small">{{ ct.notes or '-' }}</td>
+                <td class="text-end text-nowrap">
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        data-id="{{ ct.contact_id }}"
+                        data-company-id="{{ ct.company_id }}"
+                        data-first="{{ ct.first_name }}"
+                        data-last="{{ ct.last_name }}"
+                        data-title="{{ ct.job_title or '' }}"
+                        data-email="{{ ct.email or '' }}"
+                        data-phone="{{ ct.phone or '' }}"
+                        data-linkedin="{{ ct.linkedin_url or '' }}"
+                        data-notes="{{ ct.notes or '' }}"
+                        onclick="openEditContactModal(this)">
+                        Edit
+                    </button>
+                    <form class="d-inline" method="POST" action="{{ url_for('delete_contact', contact_id=ct.contact_id) }}" onsubmit="return confirm('Delete this contact?');">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="7" class="text-center text-muted py-4">No contacts yet. Click "+ Add Contact" to create one.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add/Edit Contact Modal -->
+<div class="modal fade" id="contactModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow" style="border-radius: 16px;">
+            <form id="contactForm" method="POST" action="{{ url_for('contacts') }}">
+                <div class="modal-header border-bottom">
+                    <h2 class="modal-title h5 fw-bold" id="contactModalTitle">Add Contact</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Company *</label>
+                            <select class="form-select" id="contactCompanyId" name="company_id" required>
+                                <option value="">Select company...</option>
+                                {% for c in companies %}
+                                    <option value="{{ c.company_id }}">{{ c.company_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">First Name *</label>
+                            <input type="text" class="form-control" id="contactFirstName" name="first_name" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Last Name *</label>
+                            <input type="text" class="form-control" id="contactLastName" name="last_name" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Job Title</label>
+                            <input type="text" class="form-control" id="contactTitle" name="job_title" placeholder="Technical Recruiter">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Email</label>
+                            <input type="email" class="form-control" id="contactEmail" name="email">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Phone</label>
+                            <input type="text" class="form-control" id="contactPhone" name="phone">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">LinkedIn URL</label>
+                            <input type="text" class="form-control" id="contactLinkedIn" name="linkedin_url">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Notes</label>
+                            <input type="text" class="form-control" id="contactNotes" name="notes">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-top">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-brand" id="contactSubmitBtn">Save Contact</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function getContactModal() {
+        return bootstrap.Modal.getOrCreateInstance(document.getElementById('contactModal'));
+    }
+
+    function openAddContactModal() {
+        const form = document.getElementById('contactForm');
+        document.getElementById('contactModalTitle').textContent = 'Add Contact';
+        document.getElementById('contactSubmitBtn').textContent = 'Save Contact';
+        form.action = "{{ url_for('contacts') }}";
+        form.reset();
+        getContactModal().show();
+    }
+
+    function openEditContactModal(btn) {
+        const form = document.getElementById('contactForm');
+        document.getElementById('contactModalTitle').textContent = 'Edit Contact';
+        document.getElementById('contactSubmitBtn').textContent = 'Save Changes';
+        form.action = `/contacts/update/${btn.dataset.id}`;
+
+        document.getElementById('contactCompanyId').value = btn.dataset.companyId;
+        document.getElementById('contactFirstName').value = btn.dataset.first;
+        document.getElementById('contactLastName').value = btn.dataset.last;
+        document.getElementById('contactTitle').value = btn.dataset.title;
+        document.getElementById('contactEmail').value = btn.dataset.email;
+        document.getElementById('contactPhone').value = btn.dataset.phone;
+        document.getElementById('contactLinkedIn').value = btn.dataset.linkedin;
+        document.getElementById('contactNotes').value = btn.dataset.notes;
+
+        getContactModal().show();
+    }
+</script>
+{% endblock %}
