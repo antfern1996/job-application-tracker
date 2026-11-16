@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 fw-bold mb-0">Job Match</h1>
+</div>
+
+<div class="dashboard-card mb-4">
+    <form method="POST" action="{{ url_for('job_match') }}">
+        <label for="skillsInput" class="form-label fw-semibold">Your Skills (comma-separated)</label>
+        <div class="input-group">
+            <input
+                type="text"
+                class="form-control"
+                id="skillsInput"
+                name="skills"
+                placeholder="e.g., Python, SQL, Git, Flask"
+                value="{{ skills_input }}"
+                required>
+            <button type="submit" class="btn btn-brand px-4">Match Jobs</button>
+        </div>
+        <div class="form-text mt-2">
+            Compares your skills against job requirements stored in the database and ranks roles by match percentage.
+        </div>
+    </form>
+</div>
+
+{% if searched %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h5 fw-bold mb-0">Matching Jobs ({{ matches|length }})</h2>
+        {% if unlisted_count > 0 %}
+            <span class="text-muted small">{{ unlisted_count }} job(s) skipped (no required skills listed yet)</span>
+        {% endif %}
+    </div>
+
+    {% if matches %}
+        <div class="d-flex flex-column gap-3">
+            {% for item in matches %}
+            <div class="dashboard-card">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                    <div>
+                        <span class="badge me-2" style="background-color: var(--blue-900);">#{{ loop.index }}</span>
+                        <span class="h5 fw-bold mb-0">{{ item.job.job_title }}</span>
+                        <span class="text-muted">at {{ item.job.company_name }}</span>
+                    </div>
+                    <div class="text-end">
+                        <span class="fs-5 fw-bold {{ 'text-success' if item.match_pct >= 75 else ('text-primary' if item.match_pct >= 40 else 'text-secondary') }}">
+                            {{ item.match_pct }}%
+                        </span>
+                        <span class="text-muted small">({{ item.matched_count }}/{{ item.total_required }} required skills)</span>
+                    </div>
+                </div>
+
+                <div class="progress mb-3" style="height: 8px;">
+                    <div
+                        class="progress-bar {{ 'bg-success' if item.match_pct >= 75 else 'bg-primary' }}"
+                        role="progressbar"
+                        style="width: {{ item.match_pct }}%;"
+                        aria-valuenow="{{ item.match_pct }}"
+                        aria-valuemin="0"
+                        aria-valuemax="100">
+                    </div>
+                </div>
+
+                <div class="row g-2 small">
+                    <div class="col-md-4">
+                        <div class="fw-semibold text-success mb-1">Matched Required:</div>
+                        {% for s in item.matched_req %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle">{{ s }}</span>
+                        {% else %}
+                            <span class="text-muted">None</span>
+                        {% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fw-semibold text-danger mb-1">Missing Required:</div>
+                        {% for s in item.missing_req %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">{{ s }}</span>
+                        {% else %}
+                            <span class="text-muted">None</span>
+                        {% endfor %}
+                    </div>
+                    <div class="col-md-4">
+                        <div class="fw-semibold text-primary mb-1">Bonus Preferred Matched:</div>
+                        {% for s in item.matched_pref %}
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">{{ s }}</span>
+                        {% else %}
+                            <span class="text-muted">None</span>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="dashboard-card text-center text-muted py-4">
+            No jobs currently have required skills defined. Edit a job on the Jobs page to add required skills.
+        </div>
+    {% endif %}
+{% endif %}
+{% endblock %}

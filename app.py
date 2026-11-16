@@ -77,6 +77,43 @@ def _parse_application_form(form):
     }
 
 
+def _rank_jobs_by_skills(user_skills_raw):
+    user_skills_map = {s.strip().lower(): s.strip() for s in user_skills_raw.split(',') if s.strip()}
+    if not user_skills_map:
+        return [], 0
+
+    all_jobs = db.get_all_jobs()
+    ranked = []
+    unlisted_count = 0
+
+    for job in all_jobs:
+        req = job.get('requirements') or {}
+        req_skills = req.get('required_skills', [])
+        pref_skills = req.get('preferred_skills', [])
+
+        if not req_skills:
+            unlisted_count += 1
+            continue
+
+        matched_req = [s for s in req_skills if s.lower() in user_skills_map]
+        missing_req = [s for s in req_skills if s.lower() not in user_skills_map]
+        matched_pref = [s for s in pref_skills if s.lower() in user_skills_map]
+
+        match_pct = round((len(matched_req) / len(req_skills)) * 100)
+        ranked.append({
+            'job': job,
+            'match_pct': match_pct,
+            'matched_count': len(matched_req),
+            'total_required': len(req_skills),
+            'matched_req': matched_req,
+            'missing_req': missing_req,
+            'matched_pref': matched_pref
+        })
+
+    ranked.sort(key=lambda item: (item['match_pct'], len(item['matched_pref'])), reverse=True)
+    return ranked, unlisted_count
+
+
 @app.route('/')
 def dashboard():
     data = db.get_dashboard_data()
@@ -277,6 +314,32 @@ def delete_contact(contact_id):
     db.delete_contact(contact_id)
     flash('Contact deleted.', 'success')
     return redirect(url_for('contacts'))
+
+
+# --- JOB MATCH ---
+@app.route('/job-match', methods=['GET', 'POST'])
+def job_match():
+    skills_input = ''
+    matches = []
+    unlisted_count = 0
+    searched = False
+
+    if request.method == 'POST':
+        skills_input = request.form.get('skills', '').strip()
+        if not skills_input:
+            flash('Enter at least one skill to match jobs.', 'error')
+            return redirect(url_for('job_match'))
+
+        searched = True
+        matches, unlisted_count = _rank_jobs_by_skills(skills_input)
+
+    return render_template(
+        'job_match.html',
+        skills_input=skills_input,
+        matches=matches,
+        unlisted_count=unlisted_count,
+        searched=searched
+    )
 
 
 if __name__ == '__main__':
