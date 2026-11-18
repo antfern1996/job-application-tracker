@@ -24,7 +24,7 @@
             <tr>
                 <td class="fw-semibold">{{ c.company_name }}</td>
                 <td>{{ c.industry or '-' }}</td>
-                <td>{{ c.city or '' }}{{ ', ' + c.state if c.state else '' }}</td>
+                <td>{{ [c.city, c.state] | select | join(', ') or '-' }}</td>
                 <td>{{ c.website or '-' }}</td>
                 <td class="text-muted small">{{ c.notes or '-' }}</td>
                 <td class="text-end text-nowrap">

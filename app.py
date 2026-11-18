@@ -7,6 +7,16 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'cop4751-job-tracker-secret-key')
 
 
+def _parse_float(raw_value):
+    val = raw_value.strip()
+    if not val:
+        return None
+    try:
+        return float(val)
+    except ValueError:
+        return None
+
+
 def _parse_job_form(form):
     required_skills = [s.strip() for s in form.get('required_skills', '').split(',') if s.strip()]
     preferred_skills = [s.strip() for s in form.get('preferred_skills', '').split(',') if s.strip()]
@@ -26,15 +36,12 @@ def _parse_job_form(form):
     if remote_option or requirements:
         requirements['remote_option'] = remote_option
 
-    salary_min = form.get('salary_min', '').strip()
-    salary_max = form.get('salary_max', '').strip()
-
     return {
         'company_id': form.get('company_id', type=int),
         'job_title': form.get('job_title', '').strip(),
         'job_type': form.get('job_type', '').strip() or None,
-        'salary_min': float(salary_min) if salary_min else None,
-        'salary_max': float(salary_max) if salary_max else None,
+        'salary_min': _parse_float(form.get('salary_min', '')),
+        'salary_max': _parse_float(form.get('salary_max', '')),
         'posting_url': form.get('posting_url', '').strip() or None,
         'date_posted': form.get('date_posted', '').strip() or None,
         'is_active': 1 if form.get('is_active') == 'on' else 0,
@@ -49,7 +56,7 @@ def _parse_application_form(form):
     questions = [s.strip() for s in form.get('technical_questions', '').split(',') if s.strip()]
     feedback = form.get('feedback', '').strip()
     next_steps = form.get('next_steps', '').strip()
-    offer_raw = form.get('offer_amount', '').strip()
+    offer_amount = _parse_float(form.get('offer_amount', ''))
 
     interview_data = {}
     if rounds_raw.isdigit():
@@ -62,8 +69,8 @@ def _parse_application_form(form):
         interview_data['feedback'] = feedback
     if next_steps:
         interview_data['next_steps'] = next_steps
-    if offer_raw:
-        interview_data['offer_amount'] = float(offer_raw)
+    if offer_amount is not None:
+        interview_data['offer_amount'] = offer_amount
 
     return {
         'job_id': form.get('job_id', type=int),
@@ -343,4 +350,4 @@ def job_match():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
